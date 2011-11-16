@@ -20,6 +20,8 @@ public class UDPRes {
 			resBytes.add(b);
 			
 		}
+		// 封入恢复标志，第3字节首位置1
+		resBytes.set(2, (byte)(((byte)resBytes.get(2)) | ((byte)0x80)));
 		// 封入回答个数
 		byte[] byteTemp = intToByteArray(records.length);
 		resBytes.set(6, byteTemp[2]);

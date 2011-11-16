@@ -49,7 +49,9 @@ public class UDPServer {
                     		System.out.println();
                     	}
                     }
+                    System.out.println();
                     //i = 0;// 循环接收
+                    
                     
                     Record [] records = new Lookup("www.google.cn", Type.A).run();
                     UDPRes udpResponse = new UDPRes();
@@ -58,6 +60,8 @@ public class UDPServer {
 						queryBytes[j] = receiveByte[j];
 					}
                     byte[] res = udpResponse.getResData(queryBytes, records);
+                    response(res);
+                    
                     out = new FileOutputStream("E:/res.log");
                     out.write(res);
                     out.close();
@@ -71,17 +75,20 @@ public class UDPServer {
 
 					}
                     
-//                    //send to HIT's DNS
-//                    dataPacket = new DatagramPacket(receiveByte, dataPacket.getLength(),
-//                            InetAddress.getByName("202.118.224.100"), PORT);
-//                    dataSocket.send(dataPacket);
-//                    
-                    
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+    
+    public void response(byte[] res) throws IOException {
+        System.out.println("客户端地址 : " + dataPacket.getAddress().getHostAddress()
+                + ",端口：" + dataPacket.getPort());
+        DatagramPacket dp = new DatagramPacket(res, res.length, dataPacket
+                .getAddress(), dataPacket.getPort());
+        //dp.setData(res);
+        dataSocket.send(dp);
     }
 
     public static void main(String args[]) {
