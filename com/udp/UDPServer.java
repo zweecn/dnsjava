@@ -50,7 +50,7 @@ public class UDPServer {
                     	}
                     }
                     System.out.println();
-                    //i = 0;// 循环接收
+                    i = 0;// 循环接收
                     
                     
                     Record [] records = new Lookup("www.google.cn", Type.A).run();
@@ -72,8 +72,8 @@ public class UDPServer {
 							System.out.println();
 						}
                     	System.out.printf("%02x ", res[k]);
-
 					}
+                    System.out.println();
                     
                 }
             }

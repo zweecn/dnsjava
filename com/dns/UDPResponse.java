@@ -119,7 +119,7 @@ public class UDPResponse {
 			resData[i++] = byteArray[0];
 			resData[i++] = byteArray[1];
 			
-			if (j==0 || !name[j].equals(name[0])) {
+			if ((j==0 || !name[j].equals(name[0]))) {
 				byte[] domainBytes = name[j].getBytes();
 				for (int k = 0; k < domainBytes.length; k++) {
 					resData[i++] = domainBytes[k];

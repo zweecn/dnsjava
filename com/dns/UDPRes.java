@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.xbill.DNS.ARecord;
+import org.xbill.DNS.CNAMERecord;
 import org.xbill.DNS.Record;
 
 public class UDPRes {
@@ -43,6 +44,7 @@ public class UDPRes {
 			byteTemp = intToByteArray(records[j].getType());
 			resBytes.add(byteTemp[2]);
 			resBytes.add(byteTemp[3]);
+			int cnamePos = resBytes.size()-1;
 			// 2字节类 （类 Dclass）
 			byteTemp = intToByteArray(records[j].getDClass());
 			resBytes.add(byteTemp[2]);
@@ -56,12 +58,14 @@ public class UDPRes {
 			
 			
 			if (j == 0) {
+				resBytes.set(cnamePos, (byte)0x05);
 				// 2字节数据长度 
 				byteTemp = shortToByteArray(records[j].getName().length());
 				resBytes.add(byteTemp[0]);
 				resBytes.add(byteTemp[1]);
 				// 域名
-				String[] domains = records[j].getName().toString().split("\\.");
+				String[] domains = (records[j].getName().toString().split("\\."));
+				System.out.println(domains);
 				for (String s : domains) {
 					if (s != null && !s.isEmpty() && s!="") {
 						byteTemp = s.getBytes();
@@ -72,7 +76,7 @@ public class UDPRes {
 					}
 				}
 				resBytes.add((byte)0);
-			} else { 
+			} else {
 				// 2字节数据长度 
 				resBytes.add((byte)0x00);
 				resBytes.add((byte)0x04);
