@@ -39,21 +39,23 @@ public class UDPServer {
                 if (i > 0) {
                     // 指定接收到数据的长度,可使接收数据正常显示,开始时很容易忽略这一点
                     receiveStr = new String(receiveByte, 0, dataPacket.getLength());
-                    System.out.println(receiveStr);
+                    //System.out.println(receiveStr);
                     StringBuffer queryBuffer = new StringBuffer();
                     
                     int head = 0x0c;
-                    int len = receiveStr.charAt(head);
+                    int len = receiveByte[head];// = receiveStr.charAt(head);
                     int curr = head+1;
-                    while (len != 0) {
+                    while (len != 0 && curr < dataPacket.getLength()) {
                     	if (curr - head > len) {
                     		head = curr;
-                    		len = receiveStr.charAt(curr++);
+                    		//len = receiveStr.charAt(curr++);
+                    		len = receiveByte[curr++];
                     		if (len != 0) {
                     			queryBuffer.append(".");
                     		}
                     	} else {
-                    		queryBuffer.append(receiveStr.charAt(curr++));
+                    		//queryBuffer.append(receiveStr.charAt(curr++));
+                    		queryBuffer.append((char)receiveByte[curr++]);
                     	}
                     }
 
@@ -76,7 +78,7 @@ public class UDPServer {
 //							System.out.println("Cname " + k + ":" + cname[k]);
 //						}
 //                    }
-                    
+                    System.out.println("query:" + queryBuffer);
                     Record [] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
                     if (aRecords == null) {
                     	System.out.println("There is not A record");
