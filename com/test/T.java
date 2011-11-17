@@ -14,6 +14,8 @@ public class T {
 			System.out.printf("%x ", b);
 		}
 		
+		String[] c = {};
+		System.out.println("Len " + c.length);
 		
 	}
 	

@@ -6,7 +6,6 @@ import java.util.List;
 
 import org.xbill.DNS.*;
 
-import com.dns.UDPResponse;
 
 public class DNS {
 
@@ -36,8 +35,6 @@ public class DNS {
 					+ " Name:" + a.getName() + " IP:" + a.getAddress().getHostAddress());
 		}
 		
-        UDPResponse udpResponse = new UDPResponse(records);
-        System.out.println(udpResponse.getResData());
 		
 //		System.out.println();
 //		Lookup l = new Lookup("version.bind.", Type.TXT, DClass.CH);

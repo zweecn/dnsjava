@@ -1,6 +1,7 @@
 package com.udp;
 
 import java.net.*;
+import java.util.Arrays;
 import java.io.*;
 
 import org.xbill.DNS.CNAMERecord;
@@ -59,50 +60,37 @@ public class UDPServer {
                     out=new FileOutputStream("E:/query.log"); 
                     out.write(receiveByte, 0, dataPacket.getLength());
                     out.close();
-                    //System.out.println(dataPacket.getLength());
-                    for (int j=0; j<dataPacket.getLength(); j++) {
-                    	System.out.printf("%02x", receiveByte[j]);
-                    	System.out.print(" ");
-                    	if (j==15) {
-                    		System.out.println();
-                    	}
-                    }
-                    System.out.println();
+
                     i = 0;// 循环接收
                     
-                    System.out.println("query:" + queryBuffer);
-                    Record[] cnameRecords = new Lookup(queryBuffer.toString(), Type.CNAME).run();
-                    if (cnameRecords==null) {
-                    	System.out.println("There is not CName record");
-                    }
-                    else {
-                    	for (int k=0; k<cnameRecords.length; k++) {
-                    		System.out.println(((CNAMERecord)cnameRecords[k]).getAlias().toString());
-                    	}
-                    }
+                    String[] cname = {};
+//                    System.out.println("query:" + queryBuffer);
+//                    Record[] cnameRecords = new Lookup(queryBuffer.toString(), Type.CNAME).run();
+//                    if (cnameRecords==null) {
+//                    	System.out.println("There is not CName record");
+//                    }
+//                    else {
+//                    	cname = new String[cnameRecords.length];
+//                    	for (int k = 0; k < cnameRecords.length; k++) {
+//							cname[k] = ((CNAMERecord)cnameRecords[k]).getAlias().toString();
+//							System.out.println("Cname " + k + ":" + cname[k]);
+//						}
+//                    }
                     
                     Record [] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
-                    UDPRes udpResponse = new UDPRes();
-                    byte[] queryBytes = new byte[dataPacket.getLength()];
-                    for (int j = 0; j < queryBytes.length; j++) {
-						queryBytes[j] = receiveByte[j];
-					}
-                    byte[] res = udpResponse.getResData(queryBytes, aRecords);
-                    response(res);
-                    
-                    out = new FileOutputStream("E:/res.log");
-                    out.write(res);
-                    out.close();
-                    
-                    System.out.println("\nThe response is:");
-                    for (int k=0; k<res.length; k++) {
-                    	if (k%16 == 0) {
-							System.out.println();
-						}
-                    	System.out.printf("%02x ", res[k]);
-					}
-                    System.out.println();
-                    
+                    if (aRecords == null) {
+                    	System.out.println("There is not A record");
+                    } else {
+                    	System.out.println("Found A record, size:" + aRecords.length);
+                    	byte[] queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
+                    	//UDPRes udpResponse = new UDPRes();
+                    	byte[] res = new UDPRes().getResData(queryBytes, aRecords, cname);
+
+                    	response(res);
+                    	out = new FileOutputStream("E:/res.log");
+                    	out.write(res);
+                    	out.close();
+                    }
                 }
             }
         } catch (Exception e) {
@@ -110,9 +98,31 @@ public class UDPServer {
         }
     }
     
+    public void printQuery() {
+    	for (int j=0; j<dataPacket.getLength(); j++) {
+        	System.out.printf("%02x", receiveByte[j]);
+        	System.out.print(" ");
+        	if (j==15) {
+        		System.out.println();
+        	}
+        }
+        System.out.println();
+	}
+    
+    public void printResponse(byte[] res) {
+    	System.out.println("\nThe response is:");
+        for (int k=0; k<res.length; k++) {
+        	if (k%16 == 0) {
+				System.out.println();
+			}
+        	System.out.printf("%02x ", res[k]);
+		}
+        System.out.println();
+    }
+    
     public void response(byte[] res) throws IOException {
-        System.out.println("客户端地址 : " + dataPacket.getAddress().getHostAddress()
-                + ",端口：" + dataPacket.getPort());
+        System.out.println("Client: " + dataPacket.getAddress().getHostAddress()
+                + ", Port：" + dataPacket.getPort());
         DatagramPacket dp = new DatagramPacket(res, res.length, dataPacket
                 .getAddress(), dataPacket.getPort());
         //dp.setData(res);

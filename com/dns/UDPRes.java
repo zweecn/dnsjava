@@ -2,13 +2,13 @@ package com.dns;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.Inflater;
 
 import org.xbill.DNS.ARecord;
-import org.xbill.DNS.CNAMERecord;
 import org.xbill.DNS.Record;
 
 public class UDPRes {
-	public byte[] getResData(byte[] queryBytes, Record[] records) {
+	public byte[] getResData(byte[] queryBytes, Record[] records, String[] cname) {
 		if (queryBytes == null || records == null) {
 			return null;
 		}
@@ -24,20 +24,25 @@ public class UDPRes {
 		// 封入恢复标志，第3字节首位置1
 		resBytes.set(2, (byte)(((byte)resBytes.get(2)) | ((byte)0x80)));
 		// 封入回答个数
-		byte[] byteTemp = intToByteArray(records.length);
+		byte[] byteTemp = intToByteArray(records.length + cname.length);
 		resBytes.set(6, byteTemp[2]);
 		resBytes.set(7, byteTemp[3]);
 		
 		//System.out.println("Out of for, the size is: " + resBytes.size());
+		byte offset = 0;
+		int c = 0;
 		for (int j = 0; j < records.length; j++) {
 			//System.out.println("\nAdd record: " + j + " the size is:" + resBytes.size());
 			// 2字节域名指针
-			if (j == 0) {
+			if (c == 0) {
 				resBytes.add((byte)0xc0); 
 				resBytes.add((byte)0x0c);
+				offset = (byte)0x0c;
 			} else {
 				resBytes.add((byte)0xc0);
-				resBytes.add((byte)(0x0c + 16 + records[0].getName().length()));
+				//resBytes.add((byte)(offset + 16 + records[0].getName().length()));
+				resBytes.add((byte)(offset + 15 + cname[c-1].length()));
+				//offset = (byte)(offset + 16 + cname[c-1].length());
 			}
 			//System.out.println("After add, the size is:" + resBytes.size());
 			// 2字节规范名称 （类型 Type）
@@ -57,14 +62,16 @@ public class UDPRes {
 			resBytes.add(byteTemp[3]);
 			
 			
-			if (j == 0) {
+			if (c < cname.length) {
 				resBytes.set(cnamePos, (byte)0x05);
 				// 2字节数据长度 
-				byteTemp = shortToByteArray(records[j].getName().length());
+				byteTemp = shortToByteArray((short)cname[c].length());
+				//byteTemp = shortToByteArray(records[j].getName().length());
 				resBytes.add(byteTemp[0]);
 				resBytes.add(byteTemp[1]);
 				// 域名
-				String[] domains = (records[j].getName().toString().split("\\."));
+				String[] domains = (cname[c].split("\\."));
+				//String[] domains = (records[j].getName().toString().split("\\."));
 //				for (String s : domains) {
 //					System.out.println(s);
 //				}
@@ -79,6 +86,8 @@ public class UDPRes {
 					}
 				}
 				resBytes.add((byte)0);
+				j--;
+				c++;
 			} else {
 				// 2字节数据长度 
 				resBytes.add((byte)0x00);
@@ -90,7 +99,8 @@ public class UDPRes {
 					resBytes.add(b);
 				}
 			}
-		}
+			
+		} //end for
 		
 		byte[] res = new byte[resBytes.size()];
 		int i = 0;
