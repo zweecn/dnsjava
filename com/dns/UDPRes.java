@@ -9,7 +9,7 @@ import org.xbill.DNS.Record;
 
 public class UDPRes {
 	public byte[] getResData(byte[] queryBytes, Record[] records) {
-		if (queryBytes == null) {
+		if (queryBytes == null || records == null) {
 			return null;
 		}
 		List<Byte> resBytes = new ArrayList<Byte>(0);
@@ -65,7 +65,10 @@ public class UDPRes {
 				resBytes.add(byteTemp[1]);
 				// 域名
 				String[] domains = (records[j].getName().toString().split("\\."));
-				System.out.println(domains);
+//				for (String s : domains) {
+//					System.out.println(s);
+//				}
+				
 				for (String s : domains) {
 					if (s != null && !s.isEmpty() && s!="") {
 						byteTemp = s.getBytes();
@@ -82,6 +85,7 @@ public class UDPRes {
 				resBytes.add((byte)0x04);
 				//IP
 				byteTemp = ((ARecord)records[j]).getAddress().getAddress();
+				//byteTemp = ((CNAMERecord)records[j]).getAddress().getAddress();
 				for (byte b : byteTemp) {
 					resBytes.add(b);
 				}

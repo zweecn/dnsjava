@@ -3,6 +3,7 @@ package com.udp;
 import java.net.*;
 import java.io.*;
 
+import org.xbill.DNS.CNAMERecord;
 import org.xbill.DNS.Lookup;
 import org.xbill.DNS.Record;
 import org.xbill.DNS.Type;
@@ -38,6 +39,23 @@ public class UDPServer {
                     // 指定接收到数据的长度,可使接收数据正常显示,开始时很容易忽略这一点
                     receiveStr = new String(receiveByte, 0, dataPacket.getLength());
                     System.out.println(receiveStr);
+                    StringBuffer queryBuffer = new StringBuffer();
+                    
+                    int head = 0x0c;
+                    int len = receiveStr.charAt(head);
+                    int curr = head+1;
+                    while (len != 0) {
+                    	if (curr - head > len) {
+                    		head = curr;
+                    		len = receiveStr.charAt(curr++);
+                    		if (len != 0) {
+                    			queryBuffer.append(".");
+                    		}
+                    	} else {
+                    		queryBuffer.append(receiveStr.charAt(curr++));
+                    	}
+                    }
+
                     out=new FileOutputStream("E:/query.log"); 
                     out.write(receiveByte, 0, dataPacket.getLength());
                     out.close();
@@ -52,14 +70,24 @@ public class UDPServer {
                     System.out.println();
                     i = 0;// 循环接收
                     
+                    System.out.println("query:" + queryBuffer);
+                    Record[] cnameRecords = new Lookup(queryBuffer.toString(), Type.CNAME).run();
+                    if (cnameRecords==null) {
+                    	System.out.println("There is not CName record");
+                    }
+                    else {
+                    	for (int k=0; k<cnameRecords.length; k++) {
+                    		System.out.println(((CNAMERecord)cnameRecords[k]).getAlias().toString());
+                    	}
+                    }
                     
-                    Record [] records = new Lookup("www.google.cn", Type.A).run();
+                    Record [] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
                     UDPRes udpResponse = new UDPRes();
                     byte[] queryBytes = new byte[dataPacket.getLength()];
                     for (int j = 0; j < queryBytes.length; j++) {
 						queryBytes[j] = receiveByte[j];
 					}
-                    byte[] res = udpResponse.getResData(queryBytes, records);
+                    byte[] res = udpResponse.getResData(queryBytes, aRecords);
                     response(res);
                     
                     out = new FileOutputStream("E:/res.log");
