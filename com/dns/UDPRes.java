@@ -2,22 +2,23 @@ package com.dns;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.Inflater;
-
 import org.xbill.DNS.ARecord;
 import org.xbill.DNS.Record;
 
 public class UDPRes {
+	
+	public byte[] getResData(byte[] queryBytes, Record[] records) {
+		String[] cname = {};
+		return getResData(queryBytes, records, cname);
+	}
+	
 	public byte[] getResData(byte[] queryBytes, Record[] records, String[] cname) {
 		if (queryBytes == null || records == null) {
 			return null;
 		}
 		List<Byte> resBytes = new ArrayList<Byte>(0);
-		//System.out.println("Original, the size is: " + resBytes.size());
 		// 将请求数据封入首部
-		//System.out.println("The query size is:" + queryBytes.length);
 		for (byte b : queryBytes) {
-			//System.out.println("In add query, the size is:" + resBytes.size());
 			resBytes.add(b);
 			
 		}
@@ -28,11 +29,9 @@ public class UDPRes {
 		resBytes.set(6, byteTemp[2]);
 		resBytes.set(7, byteTemp[3]);
 		
-		//System.out.println("Out of for, the size is: " + resBytes.size());
 		byte offset = 0;
 		int c = 0;
 		for (int j = 0; j < records.length; j++) {
-			//System.out.println("\nAdd record: " + j + " the size is:" + resBytes.size());
 			// 2字节域名指针
 			if (c == 0) {
 				resBytes.add((byte)0xc0); 
@@ -44,7 +43,6 @@ public class UDPRes {
 				resBytes.add((byte)(offset + 15 + cname[c-1].length()));
 				//offset = (byte)(offset + 16 + cname[c-1].length());
 			}
-			//System.out.println("After add, the size is:" + resBytes.size());
 			// 2字节规范名称 （类型 Type）
 			byteTemp = intToByteArray(records[j].getType());
 			resBytes.add(byteTemp[2]);
@@ -70,12 +68,7 @@ public class UDPRes {
 				resBytes.add(byteTemp[0]);
 				resBytes.add(byteTemp[1]);
 				// 域名
-				String[] domains = (cname[c].split("\\."));
-				//String[] domains = (records[j].getName().toString().split("\\."));
-//				for (String s : domains) {
-//					System.out.println(s);
-//				}
-				
+				String[] domains = (cname[c].split("\\."));				
 				for (String s : domains) {
 					if (s != null && !s.isEmpty() && s!="") {
 						byteTemp = s.getBytes();
@@ -94,7 +87,6 @@ public class UDPRes {
 				resBytes.add((byte)0x04);
 				//IP
 				byteTemp = ((ARecord)records[j]).getAddress().getAddress();
-				//byteTemp = ((CNAMERecord)records[j]).getAddress().getAddress();
 				for (byte b : byteTemp) {
 					resBytes.add(b);
 				}
@@ -109,6 +101,8 @@ public class UDPRes {
 		}
 		return res;
 	}
+	
+	
 
 	private  byte[] shortToByteArray(short s) {
 		byte[] shortBuf = new byte[2];
