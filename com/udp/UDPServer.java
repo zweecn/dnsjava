@@ -120,4 +120,8 @@ public class UDPServer {
 		//dp.setData(res);
 		dataSocket.send(dp);
 	}
+	
+	public void blockIP() {
+		
+	}
 }

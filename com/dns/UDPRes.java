@@ -1,12 +1,20 @@
 package com.dns;
 
+import java.io.*;
+import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.xbill.DNS.ARecord;
 import org.xbill.DNS.Record;
 
 public class UDPRes {
-	
+	private static final String ipFileName = "config/blockip.ini";
+	private Map<InetAddress, InetAddress> addrMap;
+	private Set<InetAddress> blockIpSet;
 	public byte[] getResData(byte[] queryBytes, Record[] records) {
 		String[] cname = {};
 		return getResData(queryBytes, records, cname);
@@ -85,10 +93,18 @@ public class UDPRes {
 				// 2字节数据长度 
 				resBytes.add((byte)0x00);
 				resBytes.add((byte)0x04);
+				readBlockIp();
 				//IP
-				byteTemp = ((ARecord)records[j]).getAddress().getAddress();
+				InetAddress addr = ((ARecord)records[j]).getAddress();
+				if (blockIpSet != null && blockIpSet.contains(((ARecord)records[j]).getAddress())) {
+					System.out.println("Ip changed");
+					byteTemp = addrMap.get(addr).getAddress();
+				} else {
+					byteTemp = addr.getAddress();
+				}
 				for (byte b : byteTemp) {
 					resBytes.add(b);
+					System.out.println(b + " ");
 				}
 			}
 			
@@ -101,8 +117,6 @@ public class UDPRes {
 		}
 		return res;
 	}
-	
-	
 
 	private  byte[] shortToByteArray(short s) {
 		byte[] shortBuf = new byte[2];
@@ -129,5 +143,33 @@ public class UDPRes {
 			shortBuf[i] = (byte)((s >>> offset)&0xff);
 		}
 		return shortBuf;
+	}
+	
+	private void readBlockIp() {
+		addrMap = new HashMap<InetAddress, InetAddress>();
+		try {
+			FileReader fileReader = new FileReader(ipFileName);
+			BufferedReader bufferedReader = new BufferedReader(fileReader);
+			String line = null;
+			while ((line = bufferedReader.readLine()) != null) {
+				
+				if (line.isEmpty() || line.trim().charAt(0)=='#') {
+					continue;
+				}
+				String[] ips = line.trim().split(" ");
+				if (ips == null || ips.length < 1) {
+					continue;
+				} else if (ips.length >= 2) {
+					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName(ips[1]));
+				} else if (ips.length == 1) {
+					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName("127.0.0.1"));
+				}
+			}
+			blockIpSet = addrMap.keySet();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 }
