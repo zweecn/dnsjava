@@ -117,7 +117,24 @@ public class UDPServer {
 			long start = System.currentTimeMillis();
 			Record[] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
 			if (aRecords == null) {
-				System.out.println("A record was not found.");
+				System.out.println(queryBuffer);
+				if (queryBuffer.toString().trim().equals("110.1.168.192.in-addr.arpa")){
+					byte[] queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
+					UDPRes udpRes = new UDPRes(queryBytes, aRecords, ipmap);
+					byte[] res = udpRes.getResData("Wayne.com");
+					String datetimeRes = tempDate.format(new java.util.Date());
+					response(res);
+					System.out.println("Response DNS Name cost " 
+							+ (System.currentTimeMillis() - start) + " ms.");
+					writeQueryToLog(queryBuffer.toString(), datetimeQuery);
+					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+					writeLastOp(lastResponseFileName, res);
+					//writeResponseToLog(udpRes.getIPList(), datetimeRes);
+				} else {
+					System.out.println("A record was not found.");
+					writeQueryToLog(queryBuffer.toString(), datetimeQuery);
+					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+				}
 			} else {
 				//System.out.println("A record was found. size: " + aRecords.length);
 				byte[] queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());

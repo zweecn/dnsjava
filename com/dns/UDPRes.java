@@ -131,6 +131,73 @@ public class UDPRes {
 		System.out.println("Produce end. cost " + (pause - start) + " ms");
 		return res;
 	}
+	
+	public byte[] getResData(String dnsName) {
+		System.out.print("Producing the DNS packet...\t");
+		long start = System.currentTimeMillis();
+		List<Byte> resBytes = new ArrayList<Byte>();
+		// 将请求数据封入首部
+		for (byte b : queryBytes) {
+			resBytes.add(b);
+		}
+		// 封入恢复标志，第3字节首位置1
+		resBytes.set(2, (byte)(((byte)resBytes.get(2)) | ((byte)0x80)));
+		// 封入回答个数 1
+		byte[] byteTemp = intToByteArray(1);
+		resBytes.set(6, byteTemp[2]);
+		resBytes.set(7, byteTemp[3]);
+		
+		// 2字节域名指针
+		resBytes.add((byte)0xc0); 
+		resBytes.add((byte)0x0c);
+
+
+		// 2字节规范名称 （类型 Type）这里为DNS反向查询
+		byteTemp = intToByteArray(12);
+		resBytes.add(byteTemp[2]);
+		resBytes.add(byteTemp[3]);
+		//int cnamePos = resBytes.size()-1;
+		// 2字节类 （类 Dclass）
+		byteTemp = intToByteArray(1);
+		resBytes.add(byteTemp[2]);
+		resBytes.add(byteTemp[3]);
+		// 4字节TTL
+		byteTemp = longToByteArray(0);
+		resBytes.add(byteTemp[0]);
+		resBytes.add(byteTemp[1]);
+		resBytes.add(byteTemp[2]);
+		resBytes.add(byteTemp[3]);
+
+		// DNS名字
+		//resBytes.set(cnamePos, (byte)0x02);
+		// 2字节数据长度 
+		byteTemp = shortToByteArray((short)dnsName.length());
+		//byteTemp = shortToByteArray(records[j].getName().length());
+		resBytes.add(byteTemp[0]);
+		resBytes.add(byteTemp[1]);
+		// 域名
+		String[] domains = (dnsName.split("\\."));
+		for (String s : domains) {
+			if (s != null && !s.isEmpty() && s!="") {
+				byteTemp = s.getBytes();
+				resBytes.add((byte)byteTemp.length);
+				for (byte b : byteTemp) {
+					resBytes.add(b);
+				}
+			}
+		}
+		resBytes.add((byte)0);
+			
+		byte[] res = new byte[resBytes.size()];
+		int i = 0;
+		for (byte b : resBytes) {
+			res[i++] = b;
+		}
+		
+		long pause = System.currentTimeMillis();
+		System.out.println("Produce end. cost " + (pause - start) + " ms");
+		return res;
+	}
 
 	private  byte[] shortToByteArray(short s) {
 		byte[] shortBuf = new byte[2];
@@ -158,34 +225,6 @@ public class UDPRes {
 		}
 		return shortBuf;
 	}
-	
-//	private void readBlockIp() {
-//		addrMap = new HashMap<InetAddress, InetAddress>();
-//		try {
-//			FileReader fileReader = new FileReader(ipFileName);
-//			BufferedReader bufferedReader = new BufferedReader(fileReader);
-//			String line = null;
-//			while ((line = bufferedReader.readLine()) != null) {
-//				
-//				if (line.isEmpty() || line.trim().charAt(0)=='#') {
-//					continue;
-//				}
-//				String[] ips = line.trim().split(" ");
-//				if (ips == null || ips.length < 1) {
-//					continue;
-//				} else if (ips.length >= 2) {
-//					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName(ips[1]));
-//				} else if (ips.length == 1) {
-//					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName("127.0.0.1"));
-//				}
-//			}
-//			blockIpSet = addrMap.keySet();
-//		} catch (FileNotFoundException e) {
-//			e.printStackTrace();
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//		}
-//	}
 	
 	public List<String> getIPList() {
 		iplList = new ArrayList<String>();
