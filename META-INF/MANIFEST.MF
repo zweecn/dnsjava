@@ -1,0 +1,3 @@
+Manifest-Version: 1.0 
+Main-Class: com.test.TestMain
+Class-Path: . lib/org.xbill.dns_2.1.3.jar

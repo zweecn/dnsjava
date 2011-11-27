@@ -137,9 +137,14 @@ public class DNSServer {
 				}
 			// PTR 记录
 			} else if (queryType == Type.PTR) {
-				if (queryBuffer.toString().startsWith("110.1.168.192")) {
+				InetAddress addr = InetAddress.getLocalHost();
+				String localIP = addr.getHostAddress().toString();
+				String localHostName = addr.getHostName().toString();
+				String[] ipTemp = localIP.split("\\.");
+				String prefix = ipTemp[3] + "." + ipTemp[2] + "." + ipTemp[1] + "." + ipTemp[0];
+				if (queryBuffer.toString().startsWith(prefix)) {
 					DNSPacker udpRes = new DNSPacker(queryBytes);
-					byte[] res = udpRes.getDNSServerNameData("Wayne.com");
+					byte[] res = udpRes.getDNSServerNameData(localHostName);
 					response(res);
 					System.out.println(tempDate.format(new java.util.Date()) 
 							+ " Response DNS Name: Wayne.com Cost " 
@@ -168,7 +173,9 @@ public class DNSServer {
 			}
 		} catch (TextParseException e) {
 			e.printStackTrace();
-		}
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		} 
 	}
 	
 	private void response(byte[] res) {
