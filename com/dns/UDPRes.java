@@ -1,11 +1,14 @@
 package com.dns;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.xbill.DNS.ARecord;
+import org.xbill.DNS.PTRRecord;
 import org.xbill.DNS.Record;
 
 public class UDPRes {
@@ -14,6 +17,12 @@ public class UDPRes {
 	byte[] queryBytes;
 	Map<InetAddress, InetAddress> ipmap;
 	String[] cname;
+	
+	public UDPRes(byte[] queryBytes) {
+		this.queryBytes = queryBytes;
+		this.ipmap = new HashMap<InetAddress, InetAddress>();
+		this.iplList = new ArrayList<String>();
+	}
 	
 	public UDPRes(byte[] queryBytes, Record[] records, Map<InetAddress, InetAddress> ipmap) {
 		this.queryBytes = queryBytes;
@@ -29,7 +38,7 @@ public class UDPRes {
 		this.cname = cname;
 	}
 	
-	public byte[] getResData() {
+	public byte[] getARecordResponseData() {
 		System.out.print("Producing the DNS packet...\t");
 		long start = System.currentTimeMillis();
 		//readBlockIp();
@@ -132,7 +141,7 @@ public class UDPRes {
 		return res;
 	}
 	
-	public byte[] getResData(String dnsName) {
+	public byte[] getDNSNameResponseData(String dnsName) {
 		System.out.print("Producing the DNS packet...\t");
 		long start = System.currentTimeMillis();
 		List<Byte> resBytes = new ArrayList<Byte>();
@@ -187,7 +196,92 @@ public class UDPRes {
 			}
 		}
 		resBytes.add((byte)0);
-			
+		
+		byte[] res = new byte[resBytes.size()];
+		int i = 0;
+		for (byte b : resBytes) {
+			res[i++] = b;
+		}
+		
+		long pause = System.currentTimeMillis();
+		System.out.println("Produce end. cost " + (pause - start) + " ms");
+		return res;
+	}
+	
+	public byte[] getReverseDNSResponseData(String hostip) {
+		System.out.print("Producing the DNS packet...\t");
+		long start = System.currentTimeMillis();
+		List<Byte> resBytes = new ArrayList<Byte>();
+		// 将请求数据封入首部
+		for (byte b : queryBytes) {
+			resBytes.add(b);
+		}
+		// 封入恢复标志，第3字节首位置1
+		resBytes.set(2, (byte)(((byte)resBytes.get(2)) | ((byte)0x80)));
+		// 封入回答个数 
+		byte[] byteTemp = intToByteArray(records.length + 1);
+		resBytes.set(6, byteTemp[2]);
+		resBytes.set(7, byteTemp[3]);
+		
+		// 2字节域名指针
+		resBytes.add((byte)0xc0); 
+		resBytes.add((byte)0x0c);
+
+		// 2字节规范名称 （类型 Type）这里为DNS反向查询
+		byteTemp = intToByteArray(12);
+		resBytes.add(byteTemp[2]);
+		resBytes.add(byteTemp[3]);
+		// 2字节类 （类 Dclass）
+		byteTemp = intToByteArray(1);
+		resBytes.add(byteTemp[2]);
+		resBytes.add(byteTemp[3]);
+		// 4字节TTL
+		byteTemp = longToByteArray(0);
+		resBytes.add(byteTemp[0]);
+		resBytes.add(byteTemp[1]);
+		resBytes.add(byteTemp[2]);
+		resBytes.add(byteTemp[3]);
+
+		for (Record record : records) {
+			String domain = ((PTRRecord)record).getTarget().toString();
+			// 2字节数据长度 
+			byteTemp = shortToByteArray((short)domain.length());
+			//byteTemp = shortToByteArray(records[j].getName().length());
+			resBytes.add(byteTemp[0]);
+			resBytes.add(byteTemp[1]);
+			// 域名
+			String[] domains = (domain.split("\\."));
+			for (String s : domains) {
+				if (s != null && !s.isEmpty() && s!="") {
+					byteTemp = s.getBytes();
+					resBytes.add((byte)byteTemp.length);
+					for (byte b : byteTemp) {
+						resBytes.add(b);
+					}
+				}
+			}
+			resBytes.add((byte)0);
+		}
+		
+		// 2字节数据长度 
+		resBytes.add((byte)0x00);
+		resBytes.add((byte)0x04);
+		//IP
+		InetAddress addr;
+		try {
+			addr = InetAddress.getByName(hostip);
+			if (ipmap.get(addr) != null) {
+				byteTemp = ipmap.get(addr).getAddress();
+			} else {
+				byteTemp = addr.getAddress();
+			}
+			for (byte b : byteTemp) {
+				resBytes.add(b);
+			}
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
+		
 		byte[] res = new byte[resBytes.size()];
 		int i = 0;
 		for (byte b : resBytes) {

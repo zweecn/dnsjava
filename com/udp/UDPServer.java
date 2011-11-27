@@ -30,7 +30,8 @@ public class UDPServer {
 	private SimpleDateFormat tempDate;
 	private DatagramSocket dataSocket;
 	private DatagramPacket dataPacket;
-	private byte receiveByte[];
+	private byte[] receiveByte;
+	private byte[] queryBytes;
 
 	public UDPServer() {
 		Init();
@@ -55,7 +56,8 @@ public class UDPServer {
 					if (i > 0) {
 						i = 0;// 循环接收
 						StringBuffer queryBuffer = getQuery();
-						doDNS(queryBuffer);
+						int queryType = getQueryType();
+						doDNS(queryBuffer, queryType);
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -107,21 +109,57 @@ public class UDPServer {
 				queryBuffer.append((char)receiveByte[curr++]);
 			}
 		}
+		if (queryBuffer.toString().trim().endsWith("localdomain")) {
+			System.out.println("In if , querybuffer:" + queryBuffer);
+			int indexTemp = queryBuffer.lastIndexOf(".localdomain");
+			queryBuffer = new StringBuffer(queryBuffer.substring(0, indexTemp));
+			System.out.println("In if , querybuffer after:" + queryBuffer);
+		}
 		
 		return queryBuffer;
 	}
 	
-	public void doDNS(StringBuffer queryBuffer) {
+	private int getQueryType() {
+		queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
+		if (queryBytes != null && queryBytes.length > 0) {
+			return queryBytes[queryBytes.length - 3];
+		} else {
+			return 0;
+		}
+	}
+	
+	public void doDNS(StringBuffer queryBuffer, int queryType) {
 		try {
 			String datetimeQuery = tempDate.format(new java.util.Date());
 			long start = System.currentTimeMillis();
-			Record[] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
-			if (aRecords == null) {
-				System.out.println(queryBuffer);
-				if (queryBuffer.toString().trim().equals("110.1.168.192.in-addr.arpa")){
+			System.out.println("Query:"  + queryBuffer + " Type:" + queryType);
+			if (queryType == Type.A) {
+				Record[] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
+				if (aRecords == null) {
+					System.out.println("A record was not found.");
+					writeQueryToLog(queryBuffer.toString(), datetimeQuery);
+					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+				} else {
+					System.out.println("A record was found. size: " + aRecords.length);
 					byte[] queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
 					UDPRes udpRes = new UDPRes(queryBytes, aRecords, ipmap);
-					byte[] res = udpRes.getResData("Wayne.com");
+					byte[] res = udpRes.getARecordResponseData();
+					String datetimeRes = tempDate.format(new java.util.Date());
+					response(res);
+					
+					long pause = System.currentTimeMillis();
+					System.out.println("Do DNS cost " + (pause - start) + " ms.");
+					/*writeQueryToLog(queryBuffer.toString(), datetimeQuery);
+					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+					writeLastOp(lastResponseFileName, res);
+					writeResponseToLog(udpRes.getIPList(), datetimeRes);*/
+				}
+			} else if (queryType == Type.PTR) {
+				System.out.println("Type is PTR");
+				if (queryBuffer.toString().startsWith("110.1.168.192")) {	
+					//queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
+					UDPRes udpRes = new UDPRes(queryBytes);
+					byte[] res = udpRes.getDNSNameResponseData("Wayne.com");
 					String datetimeRes = tempDate.format(new java.util.Date());
 					response(res);
 					System.out.println("Response DNS Name cost " 
@@ -129,33 +167,36 @@ public class UDPServer {
 					writeQueryToLog(queryBuffer.toString(), datetimeQuery);
 					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
 					writeLastOp(lastResponseFileName, res);
-					//writeResponseToLog(udpRes.getIPList(), datetimeRes);
+				//writeResponseToLog(udpRes.getIPList(), datetimeRes);
 				} else {
-					System.out.println("A record was not found.");
-					writeQueryToLog(queryBuffer.toString(), datetimeQuery);
-					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+					Record[] ptrRecords = new Lookup(queryBuffer.toString(), Type.PTR).run();
+					if (ptrRecords == null) {
+						System.out.println("PTR Record not found.");
+						writeQueryToLog(queryBuffer.toString(), datetimeQuery);
+						writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+					} else {
+						UDPRes udpRes = new UDPRes(queryBytes, ptrRecords, ipmap);
+						String[] tmpIp = queryBuffer.toString().split("\\.");
+						String hostip = tmpIp[3] + "." + tmpIp[2] + "." + tmpIp[1] + "." + tmpIp[0];
+						System.out.println("hostip:" + hostip);
+						byte[] res = udpRes.getReverseDNSResponseData(hostip);
+						String datetimeRes = tempDate.format(new java.util.Date());
+						response(res);
+						System.out.println("Response reverse DNS cost " 
+								+ (System.currentTimeMillis() - start) + " ms.");
+						writeQueryToLog(queryBuffer.toString(), datetimeQuery);
+						writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+						writeLastOp(lastResponseFileName, res);
+						//writeResponseToLog(udpRes.getIPList(), datetimeRes);
+					}
 				}
-			} else {
-				//System.out.println("A record was found. size: " + aRecords.length);
-				byte[] queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
-				UDPRes udpRes = new UDPRes(queryBytes, aRecords, ipmap);
-				byte[] res = udpRes.getResData();
-				String datetimeRes = tempDate.format(new java.util.Date());
-				response(res);
-				
-				long pause = System.currentTimeMillis();
-				System.out.println("Do DNS cost " + (pause - start) + " ms.");
-				writeQueryToLog(queryBuffer.toString(), datetimeQuery);
-				writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
-				writeLastOp(lastResponseFileName, res);
-				writeResponseToLog(udpRes.getIPList(), datetimeRes);
 			}
 		} catch (TextParseException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	public void response(byte[] res) {
+	private void response(byte[] res) {
 		DatagramPacket dp = new DatagramPacket(res, res.length, 
 				dataPacket.getAddress(), dataPacket.getPort());
 		try {
