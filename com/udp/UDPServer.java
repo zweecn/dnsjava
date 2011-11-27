@@ -27,6 +27,8 @@ public class UDPServer {
 	private Map<InetAddress, InetAddress> ipmap;
 	
 	private FileOutputStream outlog;
+//	private FileOutputStream outLastQuery;
+//	private FileOutputStream outLastResponse;
 	private SimpleDateFormat tempDate;
 	private DatagramSocket dataSocket;
 	private DatagramPacket dataPacket;
@@ -42,6 +44,7 @@ public class UDPServer {
 		ipmap = new HashMap<InetAddress, InetAddress>();
 		readBlockIp();
 		try {
+			outlog = new FileOutputStream(logFileName, true);
 			dataSocket = new DatagramSocket(PORT);
 			receiveByte = new byte[1024];
 			dataPacket = new DatagramPacket(receiveByte, receiveByte.length);
@@ -59,11 +62,12 @@ public class UDPServer {
 						int queryType = getQueryType();
 						doDNS(queryBuffer, queryType);
 					}
-				} catch (Exception e) {
+				} catch (IOException e) {
 					e.printStackTrace();
 				}
 				System.out.println();
 			}
+			outlog.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -110,10 +114,10 @@ public class UDPServer {
 			}
 		}
 		if (queryBuffer.toString().trim().endsWith("localdomain")) {
-			System.out.println("In if , querybuffer:" + queryBuffer);
+			//System.out.println("In if , querybuffer:" + queryBuffer);
 			int indexTemp = queryBuffer.lastIndexOf(".localdomain");
 			queryBuffer = new StringBuffer(queryBuffer.substring(0, indexTemp));
-			System.out.println("In if , querybuffer after:" + queryBuffer);
+			//System.out.println("In if , querybuffer after:" + queryBuffer);
 		}
 		
 		return queryBuffer;
@@ -130,64 +134,55 @@ public class UDPServer {
 	
 	public void doDNS(StringBuffer queryBuffer, int queryType) {
 		try {
-			String datetimeQuery = tempDate.format(new java.util.Date());
 			long start = System.currentTimeMillis();
-			System.out.println("Query:"  + queryBuffer + " Type:" + queryType);
+			System.out.println(tempDate.format(new java.util.Date()) + " Query:"  
+					+ queryBuffer + " Type: " + queryType);
 			if (queryType == Type.A) {
 				Record[] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
 				if (aRecords == null) {
 					System.out.println("A record was not found.");
-					writeQueryToLog(queryBuffer.toString(), datetimeQuery);
-					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
+					//outlog.write((datetimeQuery + " " + queryBuffer).getBytes());
 				} else {
-					System.out.println("A record was found. size: " + aRecords.length);
-					byte[] queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
+					//System.out.println("A record was found. size: " + aRecords.length);
+					queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
 					UDPRes udpRes = new UDPRes(queryBytes, aRecords, ipmap);
 					byte[] res = udpRes.getARecordResponseData();
-					String datetimeRes = tempDate.format(new java.util.Date());
 					response(res);
-					
 					long pause = System.currentTimeMillis();
-					System.out.println("Do DNS cost " + (pause - start) + " ms.");
+					System.out.println(tempDate.format(new java.util.Date()) + " Response A record:" 
+							+ udpRes.getIPList() + " Cost " + (pause - start) + " ms.");
+					
+//					outlog.write((datetimeQuery + " " + queryBuffer).getBytes());
+//					writeARecordToLog(udpRes.getIPList(), datetimeRes);
 					/*writeQueryToLog(queryBuffer.toString(), datetimeQuery);
 					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
 					writeLastOp(lastResponseFileName, res);
 					writeResponseToLog(udpRes.getIPList(), datetimeRes);*/
 				}
+				
 			} else if (queryType == Type.PTR) {
-				System.out.println("Type is PTR");
 				if (queryBuffer.toString().startsWith("110.1.168.192")) {	
 					//queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
 					UDPRes udpRes = new UDPRes(queryBytes);
 					byte[] res = udpRes.getDNSNameResponseData("Wayne.com");
-					String datetimeRes = tempDate.format(new java.util.Date());
 					response(res);
-					System.out.println("Response DNS Name cost " 
+					System.out.println(tempDate.format(new java.util.Date()) 
+							+ " Response DNS Name: Wayne.com Cost " 
 							+ (System.currentTimeMillis() - start) + " ms.");
-					writeQueryToLog(queryBuffer.toString(), datetimeQuery);
-					writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
-					writeLastOp(lastResponseFileName, res);
-				//writeResponseToLog(udpRes.getIPList(), datetimeRes);
 				} else {
 					Record[] ptrRecords = new Lookup(queryBuffer.toString(), Type.PTR).run();
 					if (ptrRecords == null) {
 						System.out.println("PTR Record not found.");
-						writeQueryToLog(queryBuffer.toString(), datetimeQuery);
-						writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
 					} else {
 						UDPRes udpRes = new UDPRes(queryBytes, ptrRecords, ipmap);
 						String[] tmpIp = queryBuffer.toString().split("\\.");
 						String hostip = tmpIp[3] + "." + tmpIp[2] + "." + tmpIp[1] + "." + tmpIp[0];
-						System.out.println("hostip:" + hostip);
+						//System.out.println("hostip:" + hostip);
 						byte[] res = udpRes.getReverseDNSResponseData(hostip);
-						String datetimeRes = tempDate.format(new java.util.Date());
 						response(res);
-						System.out.println("Response reverse DNS cost " 
+						System.out.println(tempDate.format(new java.util.Date()) 
+								+ " Response PTR record:" + udpRes.getDomainList() + " Cost "
 								+ (System.currentTimeMillis() - start) + " ms.");
-						writeQueryToLog(queryBuffer.toString(), datetimeQuery);
-						writeLastOp(lastQueryFileName, receiveByte, 0, dataPacket.getLength());
-						writeLastOp(lastResponseFileName, res);
-						//writeResponseToLog(udpRes.getIPList(), datetimeRes);
 					}
 				}
 			}
@@ -233,63 +228,61 @@ public class UDPServer {
 		}
 	}
 	
-	private void writeLastOp(String fileName, byte[] buffer) {
-		FileOutputStream out;
-		try {
-			out = new FileOutputStream(fileName);
-			out.write(buffer);
-			out.close();
-		} catch (FileNotFoundException e) {		
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+
+//	private void writeLastOp(String fileName, byte[] buffer) {
+//		FileOutputStream out;
+//		try {
+//			out = new FileOutputStream(fileName);
+//			out.write(buffer);
+//			out.close();
+//		} catch (FileNotFoundException e) {		
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//	}
 	
-	private void writeLastOp(String fileName, byte[] buffer, int offset, int length) {
-		FileOutputStream out;
-		try {
-			out = new FileOutputStream(fileName);
-			out.write(buffer, offset, length);
-			out.close();
-		} catch (FileNotFoundException e) {		
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+//	private void writeLastOp(String fileName, byte[] buffer, int offset, int length) {
+//		FileOutputStream out;
+//		try {
+//			out = new FileOutputStream(fileName);
+//			out.write(buffer, offset, length);
+//			out.close();
+//		} catch (FileNotFoundException e) {		
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//	}
 	
-	private void writeQueryToLog(String query, String datetime) {
-		try {
-			outlog = new FileOutputStream(logFileName, true);
-			String queryLog = datetime + " Query:" + query + " Client:" 
-				+ dataPacket.getAddress().getHostAddress() + " Port:" + dataPacket.getPort() + "\n";
-			System.out.println(queryLog);
-			if (query != null && !query.isEmpty()) {
-				outlog.write(queryLog.getBytes());
-				
-			}
-			outlog.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private void writeResponseToLog(List<String> ipList, String datetime) {
-		String responseLog = datetime + " Response A record:";
-		for (String ip : ipList) {
-			responseLog += " " + ip;
-		}
-		responseLog += "\n";
-		System.out.println(responseLog);
-		try {
-			outlog = new FileOutputStream(logFileName, true);
-			outlog.write(responseLog.getBytes());
-			outlog.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+//	private void writeQueryToLog(String query, String datetime) {
+//		try {
+//			outlog = new FileOutputStream(logFileName, true);
+//			String queryLog = datetime + " Query:" + query + " Client:" 
+//				+ dataPacket.getAddress().getHostAddress() + " Port:" + dataPacket.getPort() + "\n";
+//			System.out.println(queryLog);
+//			if (query != null && !query.isEmpty()) {
+//				outlog.write(queryLog.getBytes());
+//				
+//			}
+//			outlog.close();
+//		} catch (FileNotFoundException e) {
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//	}
+//	
+//	private void writeARecordToLog(List<String> ipList, String datetime) {
+//		String responseLog = datetime + " Response A record: ";
+//		for (String ip : ipList) {
+//			responseLog += " " + ip;
+//		}
+//		responseLog += "\n";
+//		try {
+//			outlog.write(responseLog.getBytes());
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//	}
 }

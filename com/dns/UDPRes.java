@@ -39,9 +39,8 @@ public class UDPRes {
 	}
 	
 	public byte[] getARecordResponseData() {
-		System.out.print("Producing the DNS packet...\t");
-		long start = System.currentTimeMillis();
-		//readBlockIp();
+		//System.out.print("Producing the DNS packet...\t");
+		//long start = System.currentTimeMillis();
 		if (queryBytes == null || records == null) {
 			return null;
 		}
@@ -136,14 +135,12 @@ public class UDPRes {
 			res[i++] = b;
 		}
 		
-		long pause = System.currentTimeMillis();
-		System.out.println("Produce end. cost " + (pause - start) + " ms");
+		//long pause = System.currentTimeMillis();
+		//System.out.println("Produce end. cost " + (pause - start) + " ms");
 		return res;
 	}
 	
 	public byte[] getDNSNameResponseData(String dnsName) {
-		System.out.print("Producing the DNS packet...\t");
-		long start = System.currentTimeMillis();
 		List<Byte> resBytes = new ArrayList<Byte>();
 		// 将请求数据封入首部
 		for (byte b : queryBytes) {
@@ -202,15 +199,10 @@ public class UDPRes {
 		for (byte b : resBytes) {
 			res[i++] = b;
 		}
-		
-		long pause = System.currentTimeMillis();
-		System.out.println("Produce end. cost " + (pause - start) + " ms");
 		return res;
 	}
 	
 	public byte[] getReverseDNSResponseData(String hostip) {
-		System.out.print("Producing the DNS packet...\t");
-		long start = System.currentTimeMillis();
 		List<Byte> resBytes = new ArrayList<Byte>();
 		// 将请求数据封入首部
 		for (byte b : queryBytes) {
@@ -288,8 +280,6 @@ public class UDPRes {
 			res[i++] = b;
 		}
 		
-		long pause = System.currentTimeMillis();
-		System.out.println("Produce end. cost " + (pause - start) + " ms");
 		return res;
 	}
 
@@ -325,11 +315,19 @@ public class UDPRes {
 		for (Record record : records) {
 			InetAddress addr = ((ARecord)record).getAddress();
 			if (ipmap.get(addr) != null) {
-				iplList.add(ipmap.get(addr).getHostName());
+				iplList.add(ipmap.get(addr).getHostAddress().toString());
 			} else {
-				iplList.add(addr.getHostName());
+				iplList.add(addr.getHostAddress().toString());
 			}
 		}
 		return iplList;
+	}
+	
+	public List<String> getDomainList() {
+		List<String> temp = new ArrayList<String>();
+		for (Record record : records) {
+			temp.add(((PTRRecord) record).getTarget().toString());
+		}
+		return temp;
 	}
 }
