@@ -1,8 +1,5 @@
 package com.test;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-
 import com.udp.UDPServer;
 
 public class TestMain {

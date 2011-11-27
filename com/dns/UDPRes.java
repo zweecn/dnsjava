@@ -1,26 +1,38 @@
 package com.dns;
 
-import java.io.*;
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.xbill.DNS.ARecord;
 import org.xbill.DNS.Record;
 
 public class UDPRes {
-	private static final String ipFileName = "config/blockip.ini";
-	private Map<InetAddress, InetAddress> addrMap;
-	private Set<InetAddress> blockIpSet;
-	public byte[] getResData(byte[] queryBytes, Record[] records) {
-		String[] cname = {};
-		return getResData(queryBytes, records, cname);
+	List<String> iplList;
+	Record[] records;
+	byte[] queryBytes;
+	Map<InetAddress, InetAddress> ipmap;
+	String[] cname;
+	
+	public UDPRes(byte[] queryBytes, Record[] records, Map<InetAddress, InetAddress> ipmap) {
+		this.queryBytes = queryBytes;
+		this.records = records;
+		this.ipmap = ipmap;
+		this.cname = new String[0];
 	}
 	
-	public byte[] getResData(byte[] queryBytes, Record[] records, String[] cname) {
+	public UDPRes(byte[] queryBytes, Record[] records, String[] cname, Map<InetAddress, InetAddress> ipmap) {
+		this.queryBytes = queryBytes;
+		this.records = records;
+		this.ipmap = ipmap;
+		this.cname = cname;
+	}
+	
+	public byte[] getResData() {
+		System.out.print("Producing the DNS packet...\t");
+		long start = System.currentTimeMillis();
+		//readBlockIp();
 		if (queryBytes == null || records == null) {
 			return null;
 		}
@@ -93,18 +105,17 @@ public class UDPRes {
 				// 2字节数据长度 
 				resBytes.add((byte)0x00);
 				resBytes.add((byte)0x04);
-				readBlockIp();
 				//IP
 				InetAddress addr = ((ARecord)records[j]).getAddress();
-				if (blockIpSet != null && blockIpSet.contains(((ARecord)records[j]).getAddress())) {
-					System.out.println("Ip changed");
-					byteTemp = addrMap.get(addr).getAddress();
+				//iplList.add(addr.getHostName());
+				if (ipmap.get(addr) != null) {
+					byteTemp = ipmap.get(addr).getAddress();
 				} else {
 					byteTemp = addr.getAddress();
 				}
 				for (byte b : byteTemp) {
 					resBytes.add(b);
-					System.out.println(b + " ");
+					//System.out.println(b + " ");
 				}
 			}
 			
@@ -115,6 +126,9 @@ public class UDPRes {
 		for (byte b : resBytes) {
 			res[i++] = b;
 		}
+		
+		long pause = System.currentTimeMillis();
+		System.out.println("Produce end. cost " + (pause - start) + " ms");
 		return res;
 	}
 
@@ -145,31 +159,44 @@ public class UDPRes {
 		return shortBuf;
 	}
 	
-	private void readBlockIp() {
-		addrMap = new HashMap<InetAddress, InetAddress>();
-		try {
-			FileReader fileReader = new FileReader(ipFileName);
-			BufferedReader bufferedReader = new BufferedReader(fileReader);
-			String line = null;
-			while ((line = bufferedReader.readLine()) != null) {
-				
-				if (line.isEmpty() || line.trim().charAt(0)=='#') {
-					continue;
-				}
-				String[] ips = line.trim().split(" ");
-				if (ips == null || ips.length < 1) {
-					continue;
-				} else if (ips.length >= 2) {
-					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName(ips[1]));
-				} else if (ips.length == 1) {
-					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName("127.0.0.1"));
-				}
+//	private void readBlockIp() {
+//		addrMap = new HashMap<InetAddress, InetAddress>();
+//		try {
+//			FileReader fileReader = new FileReader(ipFileName);
+//			BufferedReader bufferedReader = new BufferedReader(fileReader);
+//			String line = null;
+//			while ((line = bufferedReader.readLine()) != null) {
+//				
+//				if (line.isEmpty() || line.trim().charAt(0)=='#') {
+//					continue;
+//				}
+//				String[] ips = line.trim().split(" ");
+//				if (ips == null || ips.length < 1) {
+//					continue;
+//				} else if (ips.length >= 2) {
+//					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName(ips[1]));
+//				} else if (ips.length == 1) {
+//					addrMap.put(InetAddress.getByName(ips[0]), InetAddress.getByName("127.0.0.1"));
+//				}
+//			}
+//			blockIpSet = addrMap.keySet();
+//		} catch (FileNotFoundException e) {
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//	}
+	
+	public List<String> getIPList() {
+		iplList = new ArrayList<String>();
+		for (Record record : records) {
+			InetAddress addr = ((ARecord)record).getAddress();
+			if (ipmap.get(addr) != null) {
+				iplList.add(ipmap.get(addr).getHostName());
+			} else {
+				iplList.add(addr.getHostName());
 			}
-			blockIpSet = addrMap.keySet();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
+		return iplList;
 	}
 }
