@@ -4,17 +4,18 @@ import java.net.*;
 import java.text.*;
 import java.util.*;
 import java.io.*;
+
 import org.xbill.DNS.*;
 
 public class DNSServer {
 	private static final int PORT = 53;
-	private static final String logFileName = "output/dns.log";
+	//private static final String logFileName = "output/dns.log";
 	private static final String lastQueryFileName = "output/lastquery.log";
 	private static final String lastResponseFileName = "output/lastrespond.log";
 	private static final String ipFileName = "config/blockip.ini";
 	private Map<InetAddress, InetAddress> ipmap;
-	
-	private FileOutputStream outlog;
+
+	//private FileOutputStream outlog;
 	private SimpleDateFormat tempDate;
 	private DatagramSocket dataSocket;
 	private DatagramPacket dataPacket;
@@ -22,44 +23,129 @@ public class DNSServer {
 	private byte[] queryBytes;
 
 	public DNSServer() {
-		Init();
+		
+	}
+	
+	public void runServer() {
+		init();
 	}
 
-	public void Init() {
+	private void init() {
 		tempDate = new SimpleDateFormat("yyyy-MM-dd" + " " + "hh:mm:ss"); 
 		ipmap = new HashMap<InetAddress, InetAddress>();
 		readBlockIp();
+
+		//outlog = new FileOutputStream(logFileName, true);
 		try {
-			outlog = new FileOutputStream(logFileName, true);
 			dataSocket = new DatagramSocket(PORT);
 			receiveByte = new byte[1024];
 			dataPacket = new DatagramPacket(receiveByte, receiveByte.length);
 			int i = 0;
 			while (i == 0)// 无数据，则循环
 			{
-				try {
-					System.out.println("Waiting for query...");
-					dataSocket.receive(dataPacket);
-					i = dataPacket.getLength();
-					// 接收数据
-					if (i > 0) {
-						i = 0;// 循环接收
-						StringBuffer queryBuffer = getQuery();
-						int queryType = getQueryType();
-						dnsCheck(queryBuffer, queryType);
-					}
-				} catch (IOException e) {
-					e.printStackTrace();
+
+				System.out.println("Waiting for query...");
+				dataSocket.receive(dataPacket);
+				i = dataPacket.getLength();
+				// 接收数据
+				if (i > 0) {
+					i = 0;// 循环接收
+					StringBuffer queryBuffer = getQuery();
+					int queryType = getQueryType();
+					dnsCheck(queryBuffer, queryType);
 				}
+
 				System.out.println();
 			}
-			outlog.close();
+			//outlog.close();
+		} catch (SocketException e) {
+			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
 
-	public void printQuery() {
+	}
+	
+	private void dnsCheck(StringBuffer queryBuffer, int queryType) {
+		System.out.println(tempDate.format(new java.util.Date()) + " Query:"  
+				+ queryBuffer + " Type: " + queryType);
+		if (queryType == Type.A) {
+			doARecord(queryBuffer.toString());
+		} else if (queryType == Type.PTR) {
+			doRTPRecord(queryBuffer.toString());
+		}
+	}
+	
+	private void doARecord(String query) {
+		long start = System.currentTimeMillis();
+		Record[] aRecords;
+		try {
+			aRecords = new Lookup(query, Type.A).run();
+
+			if (aRecords == null) {
+				System.out.println("A record was not found.");
+			} else {
+				DNSPacker udpRes = new DNSPacker(queryBytes, aRecords, ipmap);
+				byte[] res = udpRes.getARecordResponseData();
+				response(res);
+				long pause = System.currentTimeMillis();
+				System.out.println(tempDate.format(new java.util.Date()) + " Response A record:" 
+						+ udpRes.getIPList() + " Cost " + (pause - start) + " ms.");
+
+				writeLastOp(lastQueryFileName, queryBytes);
+				writeLastOp(lastResponseFileName, res);
+			}
+		} catch (TextParseException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void doRTPRecord(String query) {
+		long start = System.currentTimeMillis();
+		InetAddress addr;
+		try {
+			addr = InetAddress.getLocalHost();
+			String localIP = addr.getHostAddress().toString();
+			String localHostName = addr.getHostName().toString();
+			String[] ipTemp = localIP.split("\\.");
+			String prefix = ipTemp[3] + "." + ipTemp[2] + "." + ipTemp[1] + "." + ipTemp[0];
+			if (query.startsWith(prefix)) {
+				DNSPacker udpRes = new DNSPacker(queryBytes);
+				byte[] res = udpRes.getDNSServerNameData(localHostName);
+				response(res);
+				System.out.println(tempDate.format(new java.util.Date()) 
+						+ " Response DNS Name: Wayne.com Cost " 
+						+ (System.currentTimeMillis() - start) + " ms.");
+
+				writeLastOp(lastQueryFileName, queryBytes);
+				writeLastOp(lastResponseFileName, res);
+			} else {
+				Record[] ptrRecords = new Lookup(query, Type.PTR).run();
+				if (ptrRecords == null) {
+					System.out.println("PTR Record not found.");
+				} else {
+					DNSPacker udpRes = new DNSPacker(queryBytes, ptrRecords, ipmap);
+					String[] tmpIp = query.split("\\.");
+					String hostip = tmpIp[3] + "." + tmpIp[2] + "." + tmpIp[1] + "." + tmpIp[0];
+					byte[] res = udpRes.getPTRRecordResponseData(hostip);
+					response(res);
+					System.out.println(tempDate.format(new java.util.Date()) 
+							+ " Response PTR record:" + udpRes.getDomainList() + " Cost "
+							+ (System.currentTimeMillis() - start) + " ms.");
+
+					writeLastOp(lastQueryFileName, queryBytes);
+					writeLastOp(lastResponseFileName, res);
+				}
+			}
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		} catch (TextParseException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	@SuppressWarnings("unused")
+	private void printQuery() {
 		for (int j=0; j<dataPacket.getLength(); j++) {
 			System.out.printf("%02x", receiveByte[j]);
 			System.out.print(" ");
@@ -70,7 +156,8 @@ public class DNSServer {
 		System.out.println();
 	}
 
-	public void printResponse(byte[] res) {
+	@SuppressWarnings("unused")
+	private void printResponse(byte[] res) {
 		System.out.println("\nThe response is:");
 		for (int k=0; k<res.length; k++) {
 			if (k%16 == 0) {
@@ -81,7 +168,7 @@ public class DNSServer {
 		System.out.println();
 	}
 
-	public StringBuffer getQuery() throws IOException {
+	private StringBuffer getQuery() {
 		StringBuffer queryBuffer = new StringBuffer();
 		int head = 0x0c;
 		int len = receiveByte[head];
@@ -101,10 +188,10 @@ public class DNSServer {
 			int indexTemp = queryBuffer.lastIndexOf(".localdomain");
 			queryBuffer = new StringBuffer(queryBuffer.substring(0, indexTemp));
 		}
-		
+
 		return queryBuffer;
 	}
-	
+
 	private int getQueryType() {
 		queryBytes = Arrays.copyOf(receiveByte, dataPacket.getLength());
 		if (queryBytes != null && queryBytes.length > 0) {
@@ -113,71 +200,7 @@ public class DNSServer {
 			return 0;
 		}
 	}
-	
-	public void dnsCheck(StringBuffer queryBuffer, int queryType) {
-		try {
-			long start = System.currentTimeMillis();
-			System.out.println(tempDate.format(new java.util.Date()) + " Query:"  
-					+ queryBuffer + " Type: " + queryType);
-			// A 记录
-			if (queryType == Type.A) {
-				Record[] aRecords = new Lookup(queryBuffer.toString(), Type.A).run();
-				if (aRecords == null) {
-					System.out.println("A record was not found.");
-				} else {
-					DNSPacker udpRes = new DNSPacker(queryBytes, aRecords, ipmap);
-					byte[] res = udpRes.getARecordResponseData();
-					response(res);
-					long pause = System.currentTimeMillis();
-					System.out.println(tempDate.format(new java.util.Date()) + " Response A record:" 
-							+ udpRes.getIPList() + " Cost " + (pause - start) + " ms.");
-					
-					writeLastOp(lastQueryFileName, queryBytes);
-					writeLastOp(lastResponseFileName, res);
-				}
-			// PTR 记录
-			} else if (queryType == Type.PTR) {
-				InetAddress addr = InetAddress.getLocalHost();
-				String localIP = addr.getHostAddress().toString();
-				String localHostName = addr.getHostName().toString();
-				String[] ipTemp = localIP.split("\\.");
-				String prefix = ipTemp[3] + "." + ipTemp[2] + "." + ipTemp[1] + "." + ipTemp[0];
-				if (queryBuffer.toString().startsWith(prefix)) {
-					DNSPacker udpRes = new DNSPacker(queryBytes);
-					byte[] res = udpRes.getDNSServerNameData(localHostName);
-					response(res);
-					System.out.println(tempDate.format(new java.util.Date()) 
-							+ " Response DNS Name: Wayne.com Cost " 
-							+ (System.currentTimeMillis() - start) + " ms.");
-					
-					writeLastOp(lastQueryFileName, queryBytes);
-					writeLastOp(lastResponseFileName, res);
-				} else {
-					Record[] ptrRecords = new Lookup(queryBuffer.toString(), Type.PTR).run();
-					if (ptrRecords == null) {
-						System.out.println("PTR Record not found.");
-					} else {
-						DNSPacker udpRes = new DNSPacker(queryBytes, ptrRecords, ipmap);
-						String[] tmpIp = queryBuffer.toString().split("\\.");
-						String hostip = tmpIp[3] + "." + tmpIp[2] + "." + tmpIp[1] + "." + tmpIp[0];
-						byte[] res = udpRes.getPTRRecordResponseData(hostip);
-						response(res);
-						System.out.println(tempDate.format(new java.util.Date()) 
-								+ " Response PTR record:" + udpRes.getDomainList() + " Cost "
-								+ (System.currentTimeMillis() - start) + " ms.");
-						
-						writeLastOp(lastQueryFileName, queryBytes);
-						writeLastOp(lastResponseFileName, res);
-					}
-				}
-			}
-		} catch (TextParseException e) {
-			e.printStackTrace();
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-		} 
-	}
-	
+
 	private void response(byte[] res) {
 		DatagramPacket dp = new DatagramPacket(res, res.length, 
 				dataPacket.getAddress(), dataPacket.getPort());
@@ -187,7 +210,7 @@ public class DNSServer {
 			e.printStackTrace();
 		}
 	}
-	
+
 	private void readBlockIp() {
 		ipmap = new HashMap<InetAddress, InetAddress>();
 		try {
@@ -195,7 +218,7 @@ public class DNSServer {
 			BufferedReader bufferedReader = new BufferedReader(fileReader);
 			String line = null;
 			while ((line = bufferedReader.readLine()) != null) {
-				
+
 				if (line.isEmpty() || line.trim().charAt(0)=='#') {
 					continue;
 				}
@@ -214,7 +237,7 @@ public class DNSServer {
 			e.printStackTrace();
 		}
 	}
-	
+
 
 	private void writeLastOp(String fileName, byte[] buffer) {
 		FileOutputStream out;
