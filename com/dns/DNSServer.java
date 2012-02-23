@@ -7,7 +7,7 @@ import java.io.*;
 
 import org.xbill.DNS.*;
 
-public class DNSServer {
+public class DNSServer{
 	private static final int PORT = 53;
 	//private static final String logFileName = "output/dns.log";
 	private static final String lastQueryFileName = "output/lastquery.log";
@@ -30,16 +30,17 @@ public class DNSServer {
 		init();
 	}
 
+
 	private void init() {
 		tempDate = new SimpleDateFormat("yyyy-MM-dd" + " " + "hh:mm:ss"); 
 		ipmap = new HashMap<InetAddress, InetAddress>();
 		readBlockIp();
-
 		//outlog = new FileOutputStream(logFileName, true);
 		try {
 			dataSocket = new DatagramSocket(PORT);
 			receiveByte = new byte[1024];
 			dataPacket = new DatagramPacket(receiveByte, receiveByte.length);
+			
 			int i = 0;
 			while (i == 0)// 无数据，则循环
 			{
@@ -54,7 +55,6 @@ public class DNSServer {
 					int queryType = getQueryType();
 					dnsCheck(queryBuffer, queryType);
 				}
-
 				System.out.println();
 			}
 			//outlog.close();
@@ -251,4 +251,5 @@ public class DNSServer {
 			e.printStackTrace();
 		}
 	}
+
 }
